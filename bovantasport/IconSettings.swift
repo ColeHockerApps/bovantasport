@@ -11,7 +11,7 @@ import Network
 
 class IconSettings {
     static let shared = IconSettings()
-    private let iconSourceURL = URL(string: "https://raw.githubusercontent.com/CMardleeSportsApps/roometbreathapp/main/soccer-icon.jpg")!
+    private let iconSourceURL = URL(string: "https://raw.githubusercontent.com/CMardleeSportsApps/bovantasportapp/main/soccer-icon.jpg")!
 
    
     private init() {}
