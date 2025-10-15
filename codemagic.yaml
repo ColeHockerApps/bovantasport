@@ -1,0 +1,78 @@
+workflows:
+  ios-appstore:
+    name: iOS → TestFlight + App Store
+    instance_type: mac_mini_m2
+    max_build_duration: 120
+
+    # Интеграция с App Store Connect (из Team settings → Integrations)
+    integrations:
+      app_store_connect: "Mr Callum Michael Paul Mcmardle"
+
+    environment:
+      xcode: latest
+      ios_signing: 
+        distribution_type: app_store
+        bundle_identifier: com.cmardle.sportapp
+      vars:
+        # Т.к. CocoaPods = no — используем .xcodeproj:
+        XCODE_PROJECT: "bovantasport.xcodeproj"
+        # Если перейдёшь на CocoaPods, вместо PROJECT используй:
+        # XCODE_WORKSPACE: "bovantasport.xcworkspace"
+        XCODE_SCHEME: "bovantasport"
+        APP_STORE_APPLE_ID: 6753986174
+
+    cache:
+      cache_paths:
+        - $HOME/Library/Caches/org.swift.swiftpm
+        - $HOME/Library/Developer/Xcode/DerivedData/**/SourcePackages
+
+    triggering:
+      events: [ push ]
+      branch_patterns:
+        - pattern: "main"
+          include: true
+          source: true
+      cancel_previous_builds: true
+
+    scripts:
+      - name: Resolve SwiftPM
+        script: |
+          xcodebuild -resolvePackageDependencies \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME"
+          # Если используешь workspace:
+          # xcodebuild -resolvePackageDependencies \
+          #   -workspace "$XCODE_WORKSPACE" \
+          #   -scheme "$XCODE_SCHEME"
+
+      - name: Set up code signing (automatic via App Store Connect)
+        script: |
+          xcode-project use-profiles
+ 
+      - name: Increment build number
+        script: |
+          LATEST=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID" || echo 0)
+          agvtool new-version -all $((LATEST+1))
+
+      - name: Build IPA
+        script: |
+          xcode-project build-ipa \
+            --project "$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME"
+          # Если используешь workspace:
+          # xcode-project build-ipa \
+          #   --workspace "$XCODE_WORKSPACE" \
+          #   --scheme "$XCODE_SCHEME"
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        # beta_groups: [ Internal ]    # при необходимости укажи группу
+        submit_to_app_store: true
+        cancel_previous_submissions: true
